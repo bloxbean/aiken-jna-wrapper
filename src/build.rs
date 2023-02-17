@@ -11,8 +11,8 @@ fn build(project_folder: &str) {
 mod tests {
     use crate::build::build;
 
-    #[test]
-    fn test_build() {
-        build("/Users/satya/work/aiken-samples/helloworld");
-    }
+    // #[test]
+    // fn test_build() {
+    //     build("/Users/satya/work/aiken-samples/helloworld");
+    // }
 }
