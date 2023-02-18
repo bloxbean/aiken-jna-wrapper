@@ -68,6 +68,8 @@ jobs:
       NAME: libaiken_jna_wrapper
       TARGET: ${{ matrix.TARGET }}
       OS: ${{ matrix.OS }}
+      LIB_NAME: ${{ matrix.LIB_NAME }}
+      TARGET_NAME: ${{ matrix.TARGET_NAME }}
     steps:
       - uses: actions/checkout@v2
       - name: Cargo cache
@@ -135,7 +137,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: result
-          path: ./artifacts
+          path: artifacts
       - name: List
         run: find ./artifacts
       - name: Release
