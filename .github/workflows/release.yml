@@ -38,8 +38,8 @@ jobs:
         include:
           - TARGET: x86_64-unknown-linux-gnu
             OS: ubuntu-latest
-            EXT: so
-            OUTPUT_PREFIX: linux-x86-64_aiken_jni_wrapper
+            LIB_NAME: libaiken_jna_wrapper.so
+            TARGET_NAME: linux-x86-64_aiken_jni_wrapper.so
 #          - TARGET: x86_64-unknown-linux-musl # test in an alpine container on a mac
 #            OS: ubuntu-latest
 #          - TARGET: aarch64-unknown-linux-gnu # tested on aws t4g.nano
@@ -56,12 +56,12 @@ jobs:
 #            OS: ubuntu-latest
           - TARGET: x86_64-apple-darwin
             OS: macos-latest
-            EXT: dylib
-            OUTPUT_PREFIX: darwin-x86-64_aiken_jni_wrapper
+            LIB_NAME: libaiken_jna_wrapper.dylib
+            TARGET_NAME: darwin-x86-64_aiken_jni_wrapper.dylib
           - TARGET: x86_64-pc-windows-msvc # tested on a windows machine
             OS: windows-latest
-            EXT: dll
-            OUTPUT_NAME: windows-x86-64_aiken_jni_wrapper
+            LIB_NAME: libaiken_jna_wrapper.dll
+            TARGET_NAME: windows-x86-64_aiken_jni_wrapper.dll
     needs: test
     runs-on: ${{ matrix.OS }}
     env:
@@ -111,18 +111,13 @@ jobs:
       - name: Compress
         run: |
           mkdir -p ./artifacts
-          # windows is the only OS using a different convention for executable file name
-          LIB_NAME=$NAME.$EXT
-          TARGET_LIB_NAME=$OUTPUT_NAME.$EXT
-      
           
           if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
             TAG=$GITHUB_REF_NAME
           else
             TAG=$GITHUB_SHA
           fi
-          mv ./target/$TARGET/release/$LIB_NAME ./TARGET_LIB_NAME
-          tar -czf ./artifacts/$NAME-$TARGET-$TAG.tar.gz $TARGET_LIB_NAME
+          mv ./target/$TARGET/release/$LIB_NAME ./artifacts/$TARGET_NAME
       - name: Archive artifact
         uses: actions/upload-artifact@v2
         with:
@@ -146,4 +141,4 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./artifacts/*.tar.gz
+          files: ./artifacts/*.*
