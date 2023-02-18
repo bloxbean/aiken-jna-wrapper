@@ -110,7 +110,7 @@ jobs:
         run: cargo build --release --verbose --target $TARGET
       - name: List target
         run: find ./target
-      - name: Compress
+      - name: Copy artifact
         run: |
           mkdir -p ./artifacts
           
@@ -120,7 +120,7 @@ jobs:
             TAG=$GITHUB_SHA
           fi
           mv ./target/$TARGET/release/$LIB_NAME ./artifacts/$TARGET_NAME
-      - name: Archive artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
           name: result
