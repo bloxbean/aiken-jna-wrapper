@@ -37,7 +37,7 @@ jobs:
         # a list of all the targets
         include:
           - TARGET: x86_64-unknown-linux-gnu
-            OS: ubuntu-latest
+            OS: ubuntu-20.04
             LIB_NAME: libaiken_jna_wrapper.so
             TARGET_NAME: linux-x86-64_libaiken_jna_wrapper.so
 #          - TARGET: x86_64-unknown-linux-musl # test in an alpine container on a mac
