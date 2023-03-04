@@ -7,7 +7,7 @@ use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
 use std::os::raw::c_char;
-use std::ffi::{CStr,CString};
+use std::ffi::{CStr, CString};
 use std::{mem, panic};
 
 #[no_mangle]
@@ -33,7 +33,7 @@ pub struct InitialBudget {
 #[allow(non_snake_case)]
 pub fn eval_phase_two(tx_hex: *const c_char, inputs: *const c_char, outputs: *const c_char, cost_mdls: *const c_char, slot_config: SlotConfig) -> *const c_char {
     let result = panic::catch_unwind(|| {
-        let tx_hex =  to_string(tx_hex);
+        let tx_hex = to_string(tx_hex);
         let inputs = to_string(inputs);
         let outputs = to_string(outputs);
         let cost_mdls = to_string(cost_mdls);
@@ -41,12 +41,18 @@ pub fn eval_phase_two(tx_hex: *const c_char, inputs: *const c_char, outputs: *co
         let ak_slot_config = uplc::tx::script_context::SlotConfig {
             zero_time: slot_config.zero_time,
             zero_slot: slot_config.zero_slot,
-            slot_length: slot_config.slot_length
+            slot_length: slot_config.slot_length,
         };
 
-        let redeemers = transaction::eval_phase_two(&tx_hex, &inputs, &outputs, &cost_mdls, ak_slot_config);
-
-        to_ptr(redeemers)
+        let result = transaction::eval_phase_two(&tx_hex, &inputs, &outputs, &cost_mdls, ak_slot_config);
+        match result {
+            Ok(redeemer) => {
+                to_ptr(redeemer)
+            }
+            Err(err) => {
+                to_ptr(format!("{:?}", err))
+            }
+        }
     });
 
     match result {
@@ -56,6 +62,7 @@ pub fn eval_phase_two(tx_hex: *const c_char, inputs: *const c_char, outputs: *co
         }
     }
 }
+
 /// Convert a native string to a Rust string
 fn to_string(pointer: *const c_char) -> String {
     let c_str: &CStr = unsafe { CStr::from_ptr(pointer) };
@@ -87,6 +94,4 @@ fn printPointer(pointer: *const c_char) {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
