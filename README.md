@@ -1,8 +1,8 @@
 # aiken-jna-wrapper
+[![Build](https://github.com/bloxbean/aiken-jna-wrapper/actions/workflows/rust.yml/badge.svg)](https://github.com/bloxbean/aiken-jna-wrapper/actions/workflows/rust.yml)
+[![Release](https://github.com/bloxbean/aiken-jna-wrapper/actions/workflows/release.yml/badge.svg)](https://github.com/bloxbean/aiken-jna-wrapper/actions/workflows/release.yml)
 
-## Build
-
-JNA wrapper for [Aiken](https://aiken-lang.org/) smart contract language. The binaries from this project are used in [aiken-java-binding](https://github.com/bloxbean/aiken-java-binding) project.
+A JNA wrapper for [Aiken](https://aiken-lang.org/) smart contract language. The binaries from this project are used in [aiken-java-binding](https://github.com/bloxbean/aiken-java-binding) project.
 
 It exposes following functions
 - Tx evaluation
