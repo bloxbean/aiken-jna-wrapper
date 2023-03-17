@@ -3,9 +3,6 @@ extern crate core;
 mod transaction;
 mod build;
 
-use jni::JNIEnv;
-use jni::objects::{JClass, JString};
-use jni::sys::jstring;
 use std::os::raw::c_char;
 use std::ffi::{CStr, CString};
 use std::{mem, panic};
@@ -31,12 +28,22 @@ pub struct InitialBudget {
 
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn eval_phase_two(tx_hex: *const c_char, inputs: *const c_char, outputs: *const c_char, cost_mdls: *const c_char, slot_config: SlotConfig) -> *const c_char {
+pub fn eval_phase_two(tx_hex: *const c_char,
+                      inputs: *const c_char,
+                      outputs: *const c_char,
+                      cost_mdls: *const c_char,
+                      initial_budget: InitialBudget,
+                      slot_config: SlotConfig) -> *const c_char {
     let result = panic::catch_unwind(|| {
         let tx_hex = to_string(tx_hex);
         let inputs = to_string(inputs);
         let outputs = to_string(outputs);
         let cost_mdls = to_string(cost_mdls);
+
+        let ak_ex_budget = uplc::machine::cost_model::ExBudget {
+            mem: initial_budget.mem as i64,
+            cpu: initial_budget.cpu as i64,
+        };
 
         let ak_slot_config = uplc::tx::script_context::SlotConfig {
             zero_time: slot_config.zero_time,
@@ -44,7 +51,7 @@ pub fn eval_phase_two(tx_hex: *const c_char, inputs: *const c_char, outputs: *co
             slot_length: slot_config.slot_length,
         };
 
-        let result = transaction::eval_phase_two(&tx_hex, &inputs, &outputs, &cost_mdls, ak_slot_config);
+        let result = transaction::eval_phase_two(&tx_hex, &inputs, &outputs, &cost_mdls, ak_ex_budget, ak_slot_config);
         match result {
             Ok(redeemer) => {
                 to_ptr(redeemer)
@@ -57,7 +64,7 @@ pub fn eval_phase_two(tx_hex: *const c_char, inputs: *const c_char, outputs: *co
 
     match result {
         Ok(c) => c,
-        Err(cause) => {
+        Err(_cause) => {
             to_ptr(String::new())
         }
     }
