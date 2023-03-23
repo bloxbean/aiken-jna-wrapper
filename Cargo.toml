@@ -10,15 +10,16 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-aiken = "0.0.29"
-uplc = "0.0.29"
-aiken-lang = "0.0.29"
-pallas-addresses = "0.16.0"
-pallas-codec = "0.16.0"
-pallas-crypto = "0.16.0"
-pallas-primitives = "0.16.0"
-pallas-traverse = "0.16.0"
-ffi-support = "0.4.2"
+aiken = { git = "https://github.com/txpipe/aiken.git", package = "aiken", rev = "80f2fd746dae3dcfa85b6afbe3b1d1dd1713a89e" }
+uplc = { git = "https://github.com/txpipe/aiken.git", package = "uplc", rev = "80f2fd746dae3dcfa85b6afbe3b1d1dd1713a89e" }
+aiken-lang = { git = "https://github.com/txpipe/aiken.git", package = "aiken-lang", rev = "80f2fd746dae3dcfa85b6afbe3b1d1dd1713a89e" }
+
+pallas-addresses = "0.18.0"
+pallas-codec = "0.18.0"
+pallas-crypto = "0.18.0"
+pallas-primitives = "0.18.0"
+pallas-traverse = "0.18.0"
+ffi-support = "0.4.4"
 jni = "0.20.0"
 hex = "0.4.3"
-minicbor = "0.18"
+minicbor = "0.19.1"
