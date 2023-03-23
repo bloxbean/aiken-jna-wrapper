@@ -22,8 +22,8 @@ pub struct SlotConfig {
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
 pub struct InitialBudget {
-    pub mem: u64,
-    pub cpu: u64,
+    pub mem: i64,
+    pub cpu: i64,
 }
 
 #[no_mangle]
@@ -41,8 +41,8 @@ pub fn eval_phase_two(tx_hex: *const c_char,
         let cost_mdls = to_string(cost_mdls);
 
         let ak_ex_budget = uplc::machine::cost_model::ExBudget {
-            mem: initial_budget.mem as i64,
-            cpu: initial_budget.cpu as i64,
+            mem: initial_budget.mem,
+            cpu: initial_budget.cpu,
         };
 
         let ak_slot_config = uplc::tx::script_context::SlotConfig {
