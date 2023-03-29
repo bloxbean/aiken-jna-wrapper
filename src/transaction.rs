@@ -1,26 +1,33 @@
-
+use pallas_primitives::babbage::CostMdls;
 use pallas_primitives::{
     babbage::{TransactionInput, TransactionOutput},
     Fragment,
 };
-use pallas_primitives::babbage::{CostMdls};
 use pallas_traverse::{Era, MultiEraTx};
+use uplc::machine::cost_model::ExBudget;
 use uplc::tx;
 use uplc::tx::error::Error;
 use uplc::tx::script_context::{ResolvedInput, SlotConfig};
-use uplc::machine::cost_model::ExBudget;
 
-pub fn eval_phase_two(tx_hex: &str, inputs: &str, outputs: &str, cost_mdls: &str, ex_budget: ExBudget, slot_config: SlotConfig) -> Result<String, Error> {
+pub fn eval_phase_two(
+    tx_hex: &str,
+    inputs: &str,
+    outputs: &str,
+    cost_mdls: &str,
+    ex_budget: ExBudget,
+    slot_config: SlotConfig,
+) -> Result<String, Error> {
     let tx_bytes = hex::decode(tx_hex).unwrap();
     let tx_bytes = tx_bytes.as_slice();
+
     let tx = MultiEraTx::decode(Era::Babbage, &tx_bytes)
-        .or_else(|_| MultiEraTx::decode(Era::Alonzo, &tx_bytes)).unwrap();
+        .or_else(|_| MultiEraTx::decode(Era::Alonzo, &tx_bytes))?;
 
     let inputs_bytes = hex::decode(inputs).unwrap();
     let outputs_bytes = hex::decode(outputs).unwrap();
 
-    let inputs = Vec::<TransactionInput>::decode_fragment(&inputs_bytes).unwrap();
-    let outputs = Vec::<TransactionOutput>::decode_fragment(&outputs_bytes).unwrap();
+    let inputs = Vec::<TransactionInput>::decode_fragment(&inputs_bytes)?;
+    let outputs = Vec::<TransactionOutput>::decode_fragment(&outputs_bytes)?;
 
     let resolved_inputs: Vec<ResolvedInput> = inputs
         .iter()
@@ -34,11 +41,18 @@ pub fn eval_phase_two(tx_hex: &str, inputs: &str, outputs: &str, cost_mdls: &str
     let cost_mdls_bytes_vec = hex::decode(cost_mdls).unwrap();
     let cost_mdls_bytes = cost_mdls_bytes_vec.as_slice();
 
-    let cost_mdls = CostMdls::decode_fragment(cost_mdls_bytes).unwrap();
+    let cost_mdls = CostMdls::decode_fragment(cost_mdls_bytes)?;
 
     if let Some(tx_babbage) = tx.as_babbage() {
-        let result =
-            tx::eval_phase_two(tx_babbage, &resolved_inputs, Some(&cost_mdls), Some(&ex_budget), &slot_config, true, |_| {});
+        let result = tx::eval_phase_two(
+            tx_babbage,
+            &resolved_inputs,
+            Some(&cost_mdls),
+            Some(&ex_budget),
+            &slot_config,
+            true,
+            |_| {},
+        );
 
         let redeemers = result?;
         let redeemer_bytes = minicbor::to_vec(redeemers).unwrap();
@@ -54,9 +68,9 @@ pub fn eval_phase_two(tx_hex: &str, inputs: &str, outputs: &str, cost_mdls: &str
 
 #[cfg(test)]
 mod tests {
+    use crate::transaction::eval_phase_two;
     use uplc::machine::cost_model::ExBudget;
     use uplc::tx::script_context::SlotConfig;
-    use crate::transaction::eval_phase_two;
 
     #[test]
     pub fn eval_phase_test() {
@@ -75,8 +89,9 @@ mod tests {
             cpu: 10000000000,
             mem: 16000000,
         };
-        
-        let redeemer = eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config).unwrap();
+
+        let redeemer =
+            eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config).unwrap();
         assert_eq!("818400001824821a00078d1a1a09552e8e", redeemer);
         println!("{:?}", redeemer)
     }
@@ -99,7 +114,8 @@ mod tests {
             mem: 16000000,
         };
 
-        let redeemer = eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config).unwrap();
+        let redeemer =
+            eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config).unwrap();
         assert_eq!("85840000d8799f58383531333163323432386237303837623866383435383533343166306265313436303039313333356535303130353562303830383562656162ff821a00200b391a37c51a83840001d8799f58383534393438346266333764386361306235366332373266346361303764633963323633666532343732346464376665363635353165623066ff821a00202ad91a38011f46840002d8799f58386563643032656335366165323862653762326132396333313737313235623139383166616631623631336636336632616663643738366135ff821a00204a791a383d2409840003d8799f58383138653033306639383861653735633762356634653433303334646239383333636661383063616532303263373339376461313861393135ff821a00206a191a387928cc840004d8799f58383336666232323131666138616535383163653439653863393136323835396330663531666535633632333763386336363764376136306361ff821a002089b91a38b52d8f", redeemer);
         println!("{:?}", redeemer)
     }
@@ -140,14 +156,33 @@ mod tests {
             slot_length: 1000,
         };
 
-        let ex_budget = ExBudget {
-            cpu: 1,
-            mem: 1,
-        };
+        let ex_budget = ExBudget { cpu: 1, mem: 1 };
 
         let redeemer = eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config);
         assert!(redeemer.is_err());
         println!("{:?}", redeemer)
     }
 
+    #[test]
+    pub fn eval_phase_two_l1_transaction_with_negative_transaction_utxo_output_should_fail() {
+        let tx_hex = "84a60081825820fe15eb46adbb14eefc7f366382006c415d7e9bc03499d3bc9ed528ca5f7d4a57080182a300581d70e37db487fbd58c45d059bcbf5cd6b1604d3bec16cf888f1395a4ebc4011a0011d28a028201d8185841d8799fa1d8799f1a125614ac1a002829e9ffd8799f1a008c6dc80000ff58205e371fd490fc09698042af01219446484dbea5fa9db55e42e1f3d145aec4dc4a00ff82583900bee45311d846fc0a8b6bc6c1d06cc212f577efa60086a9c26783c6eb1708ad5cfcd595d49f19695c86d335a339dc8d4130170e38a2cb0c9639b93102000d81825820b5f6312f937688af95106ba4d4fc0d7b71c19a7d5e1e0ea043c3cd82325ce815011082583900bee45311d846fc0a8b6bc6c1d06cc212f577efa60086a9c26783c6eb1708ad5cfcd595d49f19695c86d335a339dc8d4130170e38a2cb0c961b0000002e8fb22e45111a000f4240a20581840000d8799f58205e371fd490fc09698042af01219446484dbea5fa9db55e42e1f3d145aec4dc4aff8200000681583d583b0100003232323232323222253330064a22930b180080091129998030010a4c26600a6002600e0046660060066010004002ae695cdaab9f5742ae89f5f6";
+        let inputs = "81825820fe15eb46adbb14eefc7f366382006c415d7e9bc03499d3bc9ed528ca5f7d4a5708";
+        let outputs = "81a300581d70e37db487fbd58c45d059bcbf5cd6b1604d3bec16cf888f1395a4ebc4011a00111958028201d8185836d8799f58208941f1c54df0bc5461015e6cf41d5c407abf55515539e8e1f4f1bbc928de4c161a008c6dc81a125614ac1a002829e902ff";
+        let cost_mdls = "a10198af1a0003236119032c01011903e819023b00011903e8195e7104011903e818201a0001ca761928eb041959d818641959d818641959d818641959d818641959d818641959d81864186418641959d81864194c5118201a0002acfa182019b551041a000363151901ff00011a00015c3518201a000797751936f404021a0002ff941a0006ea7818dc0001011903e8196ff604021a0003bd081a00034ec5183e011a00102e0f19312a011a00032e801901a5011a0002da781903e819cf06011a00013a34182019a8f118201903e818201a00013aac0119e143041903e80a1a00030219189c011a00030219189c011a0003207c1901d9011a000330001901ff0119ccf3182019fd40182019ffd5182019581e18201940b318201a00012adf18201a0002ff941a0006ea7818dc0001011a00010f92192da7000119eabb18201a0002ff941a0006ea7818dc0001011a0002ff941a0006ea7818dc0001011a0011b22c1a0005fdde00021a000c504e197712041a001d6af61a0001425b041a00040c660004001a00014fab18201a0003236119032c010119a0de18201a00033d7618201979f41820197fb8182019a95d1820197df718201995aa18201a0223accc0a1a0374f693194a1f0a1a02515e841980b30a";
+
+        let slot_config = SlotConfig {
+            zero_time: 1596059091000,
+            zero_slot: 0,
+            slot_length: 1000,
+        };
+
+        let ex_budget = ExBudget {
+            cpu: 10000000000,
+            mem: 16000000,
+        };
+
+        let redeemer = eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config);
+        println!("{:?}", redeemer);
+        assert!(redeemer.is_err());
+    }
 }
