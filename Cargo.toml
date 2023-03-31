@@ -22,3 +22,6 @@ ffi-support = "0.4.2"
 jni = "0.20.0"
 hex = "0.4.3"
 minicbor = "0.18"
+serde = { version = "1.0.95", features = ["derive"] }
+serde_json = { version = "1.0.95" }
+anyhow = "1.0.70"
