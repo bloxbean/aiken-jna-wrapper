@@ -5,7 +5,7 @@
 A JNA wrapper for [Aiken](https://aiken-lang.org/) smart contract language. The binaries from this project are used in [aiken-java-binding](https://github.com/bloxbean/aiken-java-binding) project.
 
 It exposes following functions
-- Tx evaluation
+- Phase 2 transaction ExUnits evaluation
 
 ## Supported Operating Systems / Archs
 - Apple MacOS (Intel and Apple Silicon)
