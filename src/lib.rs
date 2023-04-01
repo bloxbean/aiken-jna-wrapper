@@ -134,7 +134,7 @@ fn json_fallback() -> String {
     return r#"
     {
         "status": "ERROR",
-        "error": "JSON deserialisation error."
+        "error": "ExUnitsEvaluationResponse JSON serialisation error."
      }
      "#.to_string();
 }
