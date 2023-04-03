@@ -9,7 +9,7 @@ use uplc::tx;
 use uplc::tx::script_context::{ResolvedInput, SlotConfig};
 
 use anyhow::anyhow;
-use anyhow::{Error, Result};
+use anyhow::{Result};
 
 pub fn eval_phase_two(
     tx_hex: &str,
@@ -19,26 +19,22 @@ pub fn eval_phase_two(
     ex_budget: ExBudget,
     slot_config: SlotConfig,
 ) -> Result<String> {
-    let tx_bytes: Vec<u8> = hex::decode(tx_hex).map_err(|err| anyhow!(err))?;
+    let tx_bytes: Vec<u8> = hex::decode(tx_hex).map_err(|err| anyhow!(format!("HEX: {:?}", err)))?;
 
     let tx_bytes: &[u8] = tx_bytes.as_slice();
 
     let tx: MultiEraTx = MultiEraTx::decode(Era::Babbage, &tx_bytes)
         .or_else(|_| MultiEraTx::decode(Era::Alonzo, &tx_bytes))
-        .map_err(|err| anyhow!(err))?;
+        .map_err(|err| anyhow!(format!("PALLAS: {:?}", err)))?;
 
-    let inputs_bytes: Vec<u8> = hex::decode(inputs).map_err(|err| Error::new(err))?;
-    let outputs_bytes: Vec<u8> = hex::decode(outputs).map_err(|err| Error::new(err))?;
+    let inputs_bytes: Vec<u8> = hex::decode(inputs).map_err(|err| anyhow!(format!("HEX: {:?}", err)))?;
+    let outputs_bytes: Vec<u8> = hex::decode(outputs).map_err(|err| anyhow!(format!("HEX: {:?}", err)))?;
 
-    // TODO this should not be done like this but unfortunately Err from Pallas does not implement Sync trait which anyhow requires
-    // see: https://stackoverflow.com/questions/72775437/rust-why-cant-i-use-anyhowcontext-with-this-library
     let inputs = Vec::<TransactionInput>::decode_fragment(&inputs_bytes)
-        .map_err(|err| anyhow!(format!("{:?}", err)))?;
+        .map_err(|err| anyhow!(format!("PALLAS: {:?}", err)))?;
 
-    // TODO this should not be done like this but unfortunately Err from Pallas does not implement Sync trait which anyhow requires
-    // see: https://stackoverflow.com/questions/72775437/rust-why-cant-i-use-anyhowcontext-with-this-library
     let outputs = Vec::<TransactionOutput>::decode_fragment(&outputs_bytes)
-        .map_err(|err| anyhow!(format!("{:?}", err)))?;
+        .map_err(|err| anyhow!(format!("PALLAS: {:?}", err)))?;
 
     let resolved_inputs: Vec<ResolvedInput> = inputs
         .iter()
@@ -49,15 +45,13 @@ pub fn eval_phase_two(
         })
         .collect();
 
-    let cost_mdls_bytes_vec = hex::decode(cost_mdls).map_err(|err| Error::new(err))?;
+    let cost_mdls_bytes_vec = hex::decode(cost_mdls).map_err(|err| anyhow!(format!("HEX: {:?}", err)))?;
     let cost_mdls_bytes = cost_mdls_bytes_vec.as_slice();
 
     let cost_mdls =
-        CostMdls::decode_fragment(cost_mdls_bytes).map_err(|err| anyhow!(format!("{:?}", err)))?;
+        CostMdls::decode_fragment(cost_mdls_bytes).map_err(|err| anyhow!(format!("PALLAS: {:?}", err)))?;
 
     if let Some(tx_babbage) = tx.as_babbage() {
-        // TODO this should not be done like this but unfortunately Err from Pallas does not implement Sync trait which anyhow requires
-        // see: https://stackoverflow.com/questions/72775437/rust-why-cant-i-use-anyhowcontext-with-this-library
         let redeemers = tx::eval_phase_two(
             tx_babbage,
             &resolved_inputs,
@@ -67,9 +61,9 @@ pub fn eval_phase_two(
             true,
             |_| {},
         )
-        .map_err(|err| anyhow!(format!("{:?}", err)))?;
+        .map_err(|err| anyhow!(format!("AIKEN: {:?}", err)))?;
 
-        let redeemer_bytes = minicbor::to_vec(redeemers).map_err(|err| Error::new(err))?;
+        let redeemer_bytes = minicbor::to_vec(redeemers).map_err(|err| anyhow!(format!("CBOR: {:?}", err)))?;
         let redeemer_bytes = redeemer_bytes.as_slice();
 
         let redeemers_hex = hex::encode(redeemer_bytes);
@@ -78,7 +72,7 @@ pub fn eval_phase_two(
     }
 
     return Result::Err(anyhow!(
-        "Unable to deserialise transaction and deserialise it into pallas pallas_traverse::MultiEraTx!
+        "PALLAS: unable to deserialise transaction and deserialise it into pallas pallas_traverse::MultiEraTx!
         Possible causes: either transaction is invalid or downstream's pallas library doesn't this transaction yet."
     ));
 }
@@ -206,7 +200,7 @@ mod tests {
         let redeemer = eval_phase_two(tx_hex, inputs, outputs, cost_mdls, ex_budget, slot_config);
         assert!(redeemer.is_err());
         let error_msg = redeemer.map_err(|err| format!("{:?}", err)).err().unwrap();
-        // println!("{:?}", error_msg);
-        assert!(error_msg.contains("unexpected type map at position 42: expected array"));
+        //println!("{:?}", error_msg);
+        assert!(error_msg.contains("expected array"));
     }
 }
