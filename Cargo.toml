@@ -10,18 +10,19 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-aiken = "0.0.29"
-uplc = "0.0.29"
-aiken-lang = "0.0.29"
-pallas-addresses = "0.16.0"
-pallas-codec = "0.16.0"
-pallas-crypto = "0.16.0"
-pallas-primitives = "0.16.0"
-pallas-traverse = "0.16.0"
-ffi-support = "0.4.2"
-jni = "0.20.0"
-hex = "0.4.3"
-minicbor = "0.18"
+aiken = { git = "https://github.com/txpipe/aiken.git", package = "aiken" }
+uplc = { git = "https://github.com/txpipe/aiken.git", package = "uplc" }
+aiken-lang = { git = "https://github.com/txpipe/aiken.git", package = "aiken-lang"}
+
+pallas-addresses = "0.18.0"
+pallas-codec = "0.18.0"
+pallas-crypto = "0.18.0"
+pallas-primitives = "0.18.0"
+pallas-traverse = "0.18.0"
+ffi-support = "0.4.4"
 serde = { version = "1.0.95", features = ["derive"] }
 serde_json = { version = "1.0.95" }
 anyhow = "1.0.70"
+jni = "0.20.0"
+hex = "0.4.3"
+minicbor = "0.19.1"
