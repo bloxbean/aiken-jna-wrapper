@@ -10,9 +10,9 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-aiken = "1.0.0-alpha"
-uplc = "1.0.0-alpha"
-aiken-lang = "1.0.0-alpha"
+aiken = "1.0.2-alpha"
+uplc = "1.0.2-alpha"
+aiken-lang = "1.0.2-alpha"
 
 pallas-addresses = "0.18.0"
 pallas-codec = "0.18.0"
