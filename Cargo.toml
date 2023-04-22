@@ -28,10 +28,3 @@ minicbor = "0.19.1"
 serde = { version = "1.0.95", features = ["derive"] }
 serde_json = { version = "1.0.95" }
 anyhow = "1.0.70"
-
-[patch.crates-io]
-pallas-primitives = { git = "https://github.com/txpipe/pallas.git", package = "pallas-primitives", branch = "hotfix/v0.18" }
-pallas-addresses = { git = "https://github.com/txpipe/pallas.git", package = "pallas-addresses", branch = "hotfix/v0.18" }
-pallas-codec = { git = "https://github.com/txpipe/pallas.git", package = "pallas-codec", branch = "hotfix/v0.18" }
-pallas-crypto = { git = "https://github.com/txpipe/pallas.git", package = "pallas-crypto", branch = "hotfix/v0.18" }
-pallas-traverse = { git = "https://github.com/txpipe/pallas.git", package = "pallas-traverse", branch = "hotfix/v0.18" }
