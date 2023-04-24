@@ -14,11 +14,11 @@ aiken = "1.0.2-alpha"
 uplc = "1.0.2-alpha"
 aiken-lang = "1.0.2-alpha"
 
-pallas-addresses = "0.18.0"
-pallas-codec = "0.18.0"
-pallas-crypto = "0.18.0"
-pallas-primitives = "0.18.0"
-pallas-traverse = "0.18.0"
+pallas-addresses = "0.18.1"
+pallas-codec = "0.18.1"
+pallas-crypto = "0.18.1"
+pallas-primitives = "0.18.1"
+pallas-traverse = "0.18.1"
 
 ffi-support = "0.4.4"
 jni = "0.20.0"
@@ -28,10 +28,3 @@ minicbor = "0.19.1"
 serde = { version = "1.0.95", features = ["derive"] }
 serde_json = { version = "1.0.95" }
 anyhow = "1.0.70"
-
-[patch.crates-io]
-pallas-primitives = { git = "https://github.com/txpipe/pallas.git", package = "pallas-primitives", branch = "hotfix/v0.18" }
-pallas-addresses = { git = "https://github.com/txpipe/pallas.git", package = "pallas-addresses", branch = "hotfix/v0.18" }
-pallas-codec = { git = "https://github.com/txpipe/pallas.git", package = "pallas-codec", branch = "hotfix/v0.18" }
-pallas-crypto = { git = "https://github.com/txpipe/pallas.git", package = "pallas-crypto", branch = "hotfix/v0.18" }
-pallas-traverse = { git = "https://github.com/txpipe/pallas.git", package = "pallas-traverse", branch = "hotfix/v0.18" }
