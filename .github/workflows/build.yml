@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "*" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,26 +21,26 @@ jobs:
       matrix:
         # a list of all the targets
         include:
-          - TARGET: x86_64-unknown-linux-gnu
-            OS: ubuntu-20.04
-            LIB_NAME: libaiken_jna_wrapper.so
-            TARGET_NAME: linux-x86-64_libaiken_jna_wrapper.so
+#          - TARGET: x86_64-unknown-linux-gnu
+#            OS: ubuntu-20.04
+#            LIB_NAME: libaiken_jna_wrapper.so
+#            TARGET_NAME: linux-x86-64_libaiken_jna_wrapper.so
           - TARGET: aarch64-unknown-linux-gnu
             OS: ubuntu-20.04
             LIB_NAME: libaiken_jna_wrapper.so
             TARGET_NAME: linux-aarch64_libaiken_jna_wrapper.so
-          - TARGET: x86_64-apple-darwin
-            OS: macos-latest
-            LIB_NAME: libaiken_jna_wrapper.dylib
-            TARGET_NAME: darwin-x86-64_libaiken_jna_wrapper.dylib
-          - TARGET: aarch64-apple-darwin
-            OS: macos-latest
-            LIB_NAME: libaiken_jna_wrapper.dylib
-            TARGET_NAME: darwin-aarch64_libaiken_jna_wrapper.dylib
-          - TARGET: x86_64-pc-windows-msvc # tested on a windows machine
-            OS: windows-latest
-            LIB_NAME: aiken_jna_wrapper.dll
-            TARGET_NAME: windows-x86-64_aiken_jna_wrapper.dll
+#          - TARGET: x86_64-apple-darwin
+#            OS: macos-latest
+#            LIB_NAME: libaiken_jna_wrapper.dylib
+#            TARGET_NAME: darwin-x86-64_libaiken_jna_wrapper.dylib
+#          - TARGET: aarch64-apple-darwin
+#            OS: macos-latest
+#            LIB_NAME: libaiken_jna_wrapper.dylib
+#            TARGET_NAME: darwin-aarch64_libaiken_jna_wrapper.dylib
+#          - TARGET: x86_64-pc-windows-msvc # tested on a windows machine
+#            OS: windows-latest
+#            LIB_NAME: aiken_jna_wrapper.dll
+#            TARGET_NAME: windows-x86-64_aiken_jna_wrapper.dll
     #    needs: test
     runs-on: ${{ matrix.OS }}
     env:
@@ -66,7 +66,8 @@ jobs:
           # we make cross-compilation
           if [[ $OS =~ ^ubuntu.*$ ]]; then
             sudo apt-get update
-            sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf libssl-dev
+            sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
+            sudo apt-get install -y libssl-dev
           fi
 
           # some additional configuration for cross-compilation on linux
@@ -88,39 +89,7 @@ jobs:
         run: rustup target add $TARGET
       - name: Run build
         run: cargo build --release --verbose --target $TARGET
+      - name: Run tests
+        run: cargo test --verbose
       - name: List target
         run: find ./target
-      - name: Copy artifact
-        run: |
-          mkdir -p ./artifacts
-          
-          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
-            TAG=$GITHUB_REF_NAME
-          else
-            TAG=$GITHUB_SHA
-          fi
-          mv ./target/$TARGET/release/$LIB_NAME ./artifacts/$TARGET_NAME
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: result
-          path: |
-            ./artifacts
-
-  # deploys to github releases on tag
-  deploy:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: result
-          path: artifacts
-      - name: List
-        run: find ./artifacts
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ./artifacts/*.*
