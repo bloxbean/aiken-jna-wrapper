@@ -1,6 +1,6 @@
 [package]
 name = "aiken-jna-wrapper"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["satran004", "matiwinnetou"]
 edition = "2021"
 
