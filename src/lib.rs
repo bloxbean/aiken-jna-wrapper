@@ -41,6 +41,13 @@ pub struct ExUnitsEvaluationResponse {
     redeemer_cbor: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApplyParamResponse {
+    status: Status,
+    error: Option<String>,
+    compiled_code: Option<String>,
+}
+
 #[no_mangle]
 #[allow(non_snake_case)]
 pub fn eval_phase_two(
@@ -106,6 +113,41 @@ fn eval_phase_two_inner(
     }
 }
 
+#[no_mangle]
+#[allow(non_snake_case)]
+pub fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
+    let result: Result<*const i8, Box<dyn Any + Send>> = panic::catch_unwind(|| {
+        return apply_params_to_plutus_script_inner(
+            to_string(params),
+            to_string(plutus_script)
+        );
+    }).map(|json| to_ptr(json));
+
+    match result {
+        Ok(c) => c,
+        Err(_cause) => to_ptr(error_to_json(anyhow::anyhow!(
+            "FATAL: fatal error while applying params to plutus script!"
+        ))),
+    }
+}
+
+/// Invoke apply_params_to_plutus_script and return JSON string as a result
+fn apply_params_to_plutus_script_inner(
+    params_hex: String,
+    plutus_script_hex: String
+) -> String {
+
+    let apply_params_result = transaction::apply_params_to_plutus_script(
+        &params_hex,
+        &plutus_script_hex
+    );
+
+    match apply_params_result {
+        Ok(plutus_script) => success_apply_param_json(plutus_script),
+        Err(err) => error_apply_params_json(err),
+    }
+}
+
 /// Convert a native string to a Rust string
 // TODO consider returning anyhow::Result<String>
 fn to_string(pointer: *const c_char) -> String {
@@ -156,6 +198,30 @@ fn error_to_json(error: Error) -> String {
         status: Status::ERROR,
         error: Some(error.to_string()),
         redeemer_cbor: None,
+    };
+
+    return serde_json::to_string(&response)
+        .map_err(|err| format!("JSON: {:?}", err))
+        .unwrap();
+}
+
+fn success_apply_param_json(compiled_code: String) -> String {
+    let response = ApplyParamResponse {
+        status: Status::SUCCESS,
+        error: None,
+        compiled_code: Some(compiled_code),
+    };
+
+    return serde_json::to_string(&response)
+        .map_err(|err| format!("JSON: {:?}", err))
+        .unwrap_or(format!("{:?}", json_fallback()));
+}
+
+fn error_apply_params_json(error: Error) -> String {
+    let response = ApplyParamResponse {
+        status: Status::ERROR,
+        error: Some(error.to_string()),
+        compiled_code: None,
     };
 
     return serde_json::to_string(&response)
