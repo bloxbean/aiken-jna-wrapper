@@ -10,15 +10,15 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-aiken = "1.0.15-alpha"
-uplc = "1.0.15-alpha"
-aiken-lang = "1.0.15-alpha"
+aiken = "1.0.19-alpha"
+uplc = "1.0.19-alpha"
+aiken-lang = "1.0.19-alpha"
 
-pallas-addresses = "0.18.1"
-pallas-codec = "0.18.1"
-pallas-crypto = "0.18.1"
-pallas-primitives = "0.18.1"
-pallas-traverse = "0.18.1"
+pallas-addresses = "0.18.2"
+pallas-codec = "0.18.2"
+pallas-crypto = "0.18.2"
+pallas-primitives = "0.18.2"
+pallas-traverse = "0.18.2"
 
 ffi-support = "0.4.4"
 jni = "0.20.0"
@@ -27,4 +27,4 @@ hex = "0.4.3"
 minicbor = "0.19.1"
 serde = { version = "1.0.95", features = ["derive"] }
 serde_json = { version = "1.0.95" }
-anyhow = "1.0.70"
+anyhow = "1.0.75"
