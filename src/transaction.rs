@@ -1,3 +1,6 @@
+extern crate uplc;
+extern crate pallas_primitives;
+
 use pallas_primitives::babbage::CostMdls;
 use pallas_primitives::{
     babbage::{TransactionInput, TransactionOutput},
