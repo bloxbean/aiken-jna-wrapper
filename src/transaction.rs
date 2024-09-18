@@ -1,9 +1,9 @@
 extern crate uplc;
 extern crate pallas_primitives;
 
-use pallas_primitives::babbage::CostMdls;
+use pallas_primitives::conway::CostMdls;
 use pallas_primitives::{
-    babbage::{TransactionInput, TransactionOutput},
+    conway::{TransactionInput, TransactionOutput},
     Fragment,
 };
 use pallas_traverse::{Era, MultiEraTx};
@@ -26,9 +26,9 @@ pub fn eval_phase_two(
 
     let tx_bytes: &[u8] = tx_bytes.as_slice();
 
-    let tx: MultiEraTx = MultiEraTx::decode(Era::Babbage, &tx_bytes)
-        .or_else(|_| MultiEraTx::decode(Era::Alonzo, &tx_bytes))
-        .map_err(|err| anyhow!(format!("PALLAS: {:?}", err)))?;
+    let tx = MultiEraTx::decode_for_era(Era::Conway, tx_bytes)
+        .or_else(|_| MultiEraTx::decode_for_era(Era::Babbage, tx_bytes))
+        .or_else(|_| MultiEraTx::decode_for_era(Era::Alonzo, tx_bytes))?;
 
     let inputs_bytes: Vec<u8> = hex::decode(inputs).map_err(|err| anyhow!(format!("HEX: {:?}", err)))?;
     let outputs_bytes: Vec<u8> = hex::decode(outputs).map_err(|err| anyhow!(format!("HEX: {:?}", err)))?;
@@ -54,9 +54,9 @@ pub fn eval_phase_two(
     let cost_mdls =
         CostMdls::decode_fragment(cost_mdls_bytes).map_err(|err| anyhow!(format!("PALLAS: {:?}", err)))?;
 
-    if let Some(tx_babbage) = tx.as_babbage() {
+    if let Some(tx_conway) = tx.as_conway() {
         let redeemers = tx::eval_phase_two(
-            tx_babbage,
+            tx_conway,
             &resolved_inputs,
             Some(&cost_mdls),
             Some(&ex_budget),
