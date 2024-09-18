@@ -10,7 +10,6 @@ authors = ["satran004", "matiwinnetou"]
 crate-type = ["cdylib"]
 
 [dependencies]
-#aiken = "1.0.31-alpha"
 uplc = "1.1.2"
 aiken-lang = "1.1.2"
 
