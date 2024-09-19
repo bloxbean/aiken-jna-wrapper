@@ -119,7 +119,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: result
+          name: result-${{ matrix.TARGET_NAME }}
           path: artifacts
       - name: List
         run: find ./artifacts
