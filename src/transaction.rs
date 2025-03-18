@@ -13,6 +13,7 @@ use uplc::tx::script_context::{ResolvedInput, SlotConfig};
 
 use anyhow::anyhow;
 use anyhow::{Result};
+use minicbor::to_vec;
 
 pub fn eval_phase_two(
     tx_hex: &str,
@@ -66,7 +67,13 @@ pub fn eval_phase_two(
         )
         .map_err(|err| anyhow!(format!("AIKEN: {:?}", err)))?;
 
-        let redeemer_bytes = minicbor::to_vec(redeemers).map_err(|err| anyhow!(format!("CBOR: {:?}", err)))?;
+
+        let redeemer_list: Vec<_> = redeemers
+            .iter()
+            .map(|(redeemer, _eval_result)| redeemer.clone())
+            .collect();
+
+        let redeemer_bytes = to_vec(redeemer_list).map_err(|err| anyhow!(format!("CBOR: {:?}", err)))?;
         let redeemer_bytes = redeemer_bytes.as_slice();
 
         let redeemers_hex = hex::encode(redeemer_bytes);
