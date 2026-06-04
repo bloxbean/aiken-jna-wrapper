@@ -60,7 +60,7 @@ pub fn eval_phase_two(
     initial_budget: InitialBudget,
     slot_config: SlotConfig,
 ) -> *const c_char {
-    let result: Result<*const i8, Box<dyn Any + Send>> = panic::catch_unwind(|| {
+    let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return eval_phase_two_inner(
             to_string(tx_hex),
             to_string(inputs),
@@ -118,7 +118,7 @@ fn eval_phase_two_inner(
 #[no_mangle]
 #[allow(non_snake_case)]
 pub fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
-    let result: Result<*const i8, Box<dyn Any + Send>> = panic::catch_unwind(|| {
+    let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return apply_params_to_plutus_script_inner(
             to_string(params),
             to_string(plutus_script)
