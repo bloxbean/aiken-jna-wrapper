@@ -23,11 +23,12 @@ pallas-crypto = "0.35.1"
 pallas-primitives = "0.35.1"
 pallas-traverse = "0.35.1"
 
-ffi-support = "0.4.4"
-jni = "0.21.1"
 hex = "0.4.3"
 
+# Kept on the 0.25 line: pallas-codec pins minicbor ^0.25, and transaction.rs
+# encodes pallas types whose Encode impls come from that same minicbor. A 2.x
+# bump would mismatch those trait impls and break redeemer CBOR encoding.
 minicbor = "0.25.1"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = { version = "1.0.128" }
-anyhow = "1.0.89"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.150" }
+anyhow = "1.0.102"
