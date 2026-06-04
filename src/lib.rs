@@ -268,10 +268,10 @@ fn error_apply_params_json(error: Error) -> String {
 #[cfg(test)]
 mod lib {
     use crate::{
-        dropCharPointer, eval_phase_two_inner, to_ptr, ExUnitsEvaluationResponse, InitialBudget,
-        SlotConfig, Status,
+        dropCharPointer, eval_phase_two, eval_phase_two_inner, to_ptr, ExUnitsEvaluationResponse,
+        InitialBudget, SlotConfig, Status,
     };
-    use std::ffi::CStr;
+    use std::ffi::{CStr, CString};
 
     /// to_ptr hands out an owned C string; dropCharPointer must reclaim it.
     /// This exercises the full leak-fix round-trip: allocate, read back, free.
@@ -290,6 +290,44 @@ mod lib {
     #[test]
     pub fn drop_char_pointer_ignores_null() {
         dropCharPointer(std::ptr::null());
+    }
+
+    /// End-to-end test of the real exported `extern "C"` function — the surface
+    /// JNA actually calls. Unlike the other tests (which call the inner Rust
+    /// fn), this drives the full FFI boundary: *const c_char marshalling
+    /// (to_string), the panic::catch_unwind guard, JSON serialisation, the
+    /// to_ptr -> dropCharPointer ownership round-trip. Invalid hex is used so no
+    /// large fixture is needed; the happy-path inner logic is covered elsewhere.
+    #[test]
+    pub fn eval_phase_two_ffi_boundary_returns_error_json_on_bad_input() {
+        let bad = CString::new("zz").unwrap(); // not valid hex
+        let budget = InitialBudget {
+            mem: 16000000,
+            cpu: 10000000000,
+        };
+        let slot = SlotConfig {
+            zero_time: 1596059091000,
+            zero_slot: 0,
+            slot_length: 1000,
+        };
+
+        let ptr = eval_phase_two(
+            bad.as_ptr(),
+            bad.as_ptr(),
+            bad.as_ptr(),
+            bad.as_ptr(),
+            budget,
+            slot,
+        );
+        assert!(!ptr.is_null());
+
+        let json = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
+        let response: ExUnitsEvaluationResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(response.status, Status::ERROR);
+        assert!(response.error.is_some());
+
+        // Free the string the FFI call handed back (see leak-fix tests above).
+        dropCharPointer(ptr);
     }
 
     #[test]
