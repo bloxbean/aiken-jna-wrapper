@@ -10,8 +10,11 @@ authors = ["satran004", "matiwinnetou"]
 crate-type = ["cdylib"]
 
 [dependencies]
-uplc = "1.1.13"
-aiken-lang = "1.1.13"
+# Pinned to exact versions: a caret requirement lets these float to newer
+# 1.1.x releases which depend on pallas 0.35, clashing with the pallas 0.32
+# pins below and breaking `uplc::tx::eval_phase_two` with mismatched types.
+uplc = "=1.1.13"
+aiken-lang = "=1.1.13"
 
 pallas-addresses = "0.32.0"
 pallas-codec = { version = "0.32.0", features = ["num-bigint"] }
