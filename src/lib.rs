@@ -11,6 +11,9 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::{mem, panic};
 
+// #[repr(C)] gives this a stable C memory layout so JNA can pass it by
+// value/reference into the native call. (No #[no_mangle]: it is meaningless
+// on a struct and is becoming a hard error.)
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -20,6 +23,7 @@ pub struct SlotConfig {
     pub zero_time: u64,
 }
 
+// See SlotConfig above: #[repr(C)] for a stable C layout across the FFI boundary.
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -48,6 +52,8 @@ pub struct ApplyParamResponse {
     compiled_code: Option<String>,
 }
 
+// `extern "C"` exports this with the C calling convention (not Rust's
+// unstable one) so JNA can call it; #[no_mangle] keeps the symbol name as-is.
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn eval_phase_two(
@@ -58,6 +64,8 @@ pub extern "C" fn eval_phase_two(
     initial_budget: InitialBudget,
     slot_config: SlotConfig,
 ) -> *const c_char {
+    // Use *const c_char (not *const i8) to match the return type on every
+    // platform: c_char is i8 on x86_64/Apple but u8 on aarch64-linux.
     let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return eval_phase_two_inner(
             to_string(tx_hex),
@@ -113,9 +121,11 @@ fn eval_phase_two_inner(
     }
 }
 
+// `extern "C"` for the C calling convention so JNA can call it (see eval_phase_two).
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
+    // *const c_char (not *const i8) to match the return type on all platforms; see eval_phase_two.
     let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return apply_params_to_plutus_script_inner(
             to_string(params),
@@ -166,6 +176,7 @@ fn to_ptr(string: String) -> *const c_char {
     ptr
 }
 
+// `extern "C"` so JNA can hand pointers (from to_ptr) back for cleanup.
 #[no_mangle]
 #[allow(non_snake_case)]
 extern "C" fn dropCharPointer(pointer: *const c_char) {
