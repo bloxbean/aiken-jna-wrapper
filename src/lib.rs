@@ -11,7 +11,6 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::{mem, panic};
 
-#[no_mangle]
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -21,7 +20,6 @@ pub struct SlotConfig {
     pub zero_time: u64,
 }
 
-#[no_mangle]
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -52,7 +50,7 @@ pub struct ApplyParamResponse {
 
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn eval_phase_two(
+pub extern "C" fn eval_phase_two(
     tx_hex: *const c_char,
     inputs: *const c_char,
     outputs: *const c_char,
@@ -117,7 +115,7 @@ fn eval_phase_two_inner(
 
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
+pub extern "C" fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
     let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return apply_params_to_plutus_script_inner(
             to_string(params),
@@ -170,7 +168,7 @@ fn to_ptr(string: String) -> *const c_char {
 
 #[no_mangle]
 #[allow(non_snake_case)]
-fn dropCharPointer(pointer: *const c_char) {
+extern "C" fn dropCharPointer(pointer: *const c_char) {
     mem::drop(pointer);
 }
 
