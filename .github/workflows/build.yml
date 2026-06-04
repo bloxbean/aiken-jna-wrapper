@@ -25,10 +25,10 @@ jobs:
             OS: ubuntu-20.04
             LIB_NAME: libaiken_jna_wrapper.so
             TARGET_NAME: linux-x86-64_libaiken_jna_wrapper.so
-#          - TARGET: aarch64-unknown-linux-gnu
-#            OS: ubuntu-20.04
-#            LIB_NAME: libaiken_jna_wrapper.so
-#            TARGET_NAME: linux-aarch64_libaiken_jna_wrapper.so
+          - TARGET: aarch64-unknown-linux-gnu
+            OS: ubuntu-20.04
+            LIB_NAME: libaiken_jna_wrapper.so
+            TARGET_NAME: linux-aarch64_libaiken_jna_wrapper.so
           - TARGET: x86_64-apple-darwin
             OS: macos-latest
             LIB_NAME: libaiken_jna_wrapper.dylib
