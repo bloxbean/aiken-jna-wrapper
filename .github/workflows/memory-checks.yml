@@ -1,0 +1,45 @@
+name: Memory Checks
+
+# Runs Miri over the FFI memory-management tests (to_ptr / dropCharPointer) to
+# catch leaks, double-frees and other UB in the unsafe boundary code.
+#
+# Deliberately NOT triggered on push/pull_request: Miri is slow, needs the
+# nightly toolchain, and only covers the small unsafe surface (it can't cross
+# FFI into the blst/secp256k1 C deps). Keeping it off the per-commit critical
+# path avoids taxing unrelated changes and coupling merge velocity to nightly's
+# health. Instead it runs weekly (to catch drift from dependency updates) and
+# on demand via the Actions "Run workflow" button.
+on:
+  schedule:
+    # Mondays at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  miri:
+    name: Miri (FFI memory safety)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly toolchain with Miri
+        run: rustup toolchain install nightly --component miri
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          key: miri-cargo-${{ hashFiles('Cargo.toml') }}
+      # Only the memory-management tests are run under Miri. Tests that exercise
+      # the C deps (blst/secp256k1) via eval_phase_two cannot run under Miri, so
+      # the `char_pointer` filter selects exactly the unsafe-boundary round-trip
+      # and null-guard tests. Miri reports any leaked allocation as an error.
+      - name: Run Miri on FFI memory tests
+        run: cargo +nightly miri test char_pointer
