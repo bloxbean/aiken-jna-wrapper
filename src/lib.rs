@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::{mem, panic};
+use std::panic;
 
 // #[repr(C)] gives this a stable C memory layout so JNA can pass it by
 // value/reference into the native call. (No #[no_mangle]: it is meaningless
@@ -165,22 +165,47 @@ fn to_string(pointer: *const c_char) -> String {
     c_str.to_str().unwrap().to_string()
 }
 
-/// Convert a Rust string to a native string
+/// Convert a Rust string to a native string, transferring ownership to the caller.
+///
+/// `CString::into_raw` leaks the string's heap allocation on purpose so the
+/// pointer stays valid after this function returns and Rust no longer manages
+/// it. The buffer is NOT freed here — ownership now belongs to the caller
+/// (the JVM, via JNA), which MUST hand the pointer back to `dropCharPointer`
+/// once it has copied the bytes out, or the allocation leaks. `into_raw`/
+/// `from_raw` are the matched pair that make this round-trip sound.
 // TODO consider returning anyhow::Result<String>
 fn to_ptr(string: String) -> *const c_char {
     let cs = CString::new(string.as_bytes()).unwrap();
-    let ptr = cs.as_ptr();
-    // Tell Rust not to clean up the string while we still have a pointer to it.
-    // Otherwise, we'll get a segfault.
-    mem::forget(cs);
-    ptr
+    cs.into_raw()
 }
 
-// `extern "C"` so JNA can hand pointers (from to_ptr) back for cleanup.
+/// Free a string previously produced by `to_ptr` (and returned to the JVM as
+/// the result of `eval_phase_two` / `apply_params_to_plutus_script`).
+///
+/// This reclaims the allocation that `to_ptr` deliberately leaked: `from_raw`
+/// reconstructs the owning `CString` from the raw pointer so that dropping it
+/// frees the heap buffer. The Java side calls this after reading the string
+/// out of the returned pointer.
+///
+/// # Safety / contract
+/// `pointer` must be a pointer returned by `to_ptr` and must be passed here at
+/// most once (calling twice would be a double free). A null pointer is ignored.
+/// Note the previous implementation called `mem::drop` on the `*const c_char`
+/// itself, which is a no-op for a `Copy` raw pointer and therefore leaked the
+/// string on every call.
+///
+/// `extern "C"` so JNA can hand the pointer back across the C ABI.
 #[no_mangle]
 #[allow(non_snake_case)]
 extern "C" fn dropCharPointer(pointer: *const c_char) {
-    mem::drop(pointer);
+    if pointer.is_null() {
+        return;
+    }
+    // Safety: `pointer` originated from `CString::into_raw` in `to_ptr`, so it
+    // is valid to reconstitute the `CString` and drop it to free the buffer.
+    unsafe {
+        let _ = CString::from_raw(pointer as *mut c_char);
+    }
 }
 
 fn json_fallback() -> String {
@@ -243,8 +268,29 @@ fn error_apply_params_json(error: Error) -> String {
 #[cfg(test)]
 mod lib {
     use crate::{
-        eval_phase_two_inner, ExUnitsEvaluationResponse, InitialBudget, SlotConfig, Status,
+        dropCharPointer, eval_phase_two_inner, to_ptr, ExUnitsEvaluationResponse, InitialBudget,
+        SlotConfig, Status,
     };
+    use std::ffi::CStr;
+
+    /// to_ptr hands out an owned C string; dropCharPointer must reclaim it.
+    /// This exercises the full leak-fix round-trip: allocate, read back, free.
+    /// (A leak isn't directly observable in a unit test, but this guards
+    /// against regressions that would crash, e.g. dropping a non-from_raw ptr.)
+    #[test]
+    pub fn to_ptr_then_drop_char_pointer_roundtrips() {
+        let ptr = to_ptr("hello aiken".to_string());
+        let read_back = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
+        assert_eq!(read_back, "hello aiken");
+        // Frees the allocation that to_ptr leaked. Must not crash or double-free.
+        dropCharPointer(ptr);
+    }
+
+    /// dropCharPointer must treat a null pointer as a no-op, not crash.
+    #[test]
+    pub fn drop_char_pointer_ignores_null() {
+        dropCharPointer(std::ptr::null());
+    }
 
     #[test]
     pub fn eval_phase_test_success() {
