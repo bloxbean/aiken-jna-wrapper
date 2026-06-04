@@ -9,7 +9,7 @@ It exposes following functions
 
 ## Supported Operating Systems / Archs
 - Apple MacOS (Intel and Apple Silicon)
-- Linux (x86_64) (Ubuntu 20.04 or compatible ...)
+- Linux (x86_64 and aarch64) (Ubuntu 24.04 or compatible ...)
 - Windows 64bits (x86_64)
 
 For another platform, please create a PR / request [here](https://github.com/bloxbean/aiken-jna-wrapper/issues)
