@@ -108,10 +108,8 @@ mod tests {
     use uplc::machine::cost_model::ExBudget;
     use uplc::tx::script_context::SlotConfig;
 
-    /// Both entry points decode their hex arguments first, so malformed hex must
-    /// surface as an Err (the "HEX:" branch) rather than panicking or returning
-    /// Ok. This covers the input-validation paths that the fixture-based success
-    /// tests never reach.
+    /// Malformed hex must surface as an Err, not a panic — covers the input
+    /// validation path the fixture-based success tests never reach.
     #[test]
     pub fn rejects_invalid_hex_input() {
         let slot_config = SlotConfig {
@@ -124,7 +122,6 @@ mod tests {
             mem: 16000000,
         };
 
-        // "zz" is not valid hex -> hex::decode fails -> Err.
         let eval = eval_phase_two("zz", "zz", "zz", "zz", ex_budget, slot_config);
         assert!(eval.is_err(), "invalid hex should fail eval_phase_two");
 
@@ -135,33 +132,20 @@ mod tests {
         );
     }
 
-    /// Van Rossem (Cardano Protocol Version 11) readiness probe.
+    /// Van Rossem (Protocol Version 11) readiness probe. Van Rossem adds 14 new
+    /// Plutus builtins that the `uplc` VM must support before this crate can
+    /// evaluate transactions using them. We probe by name lookup; as of uplc
+    /// 1.1.22 none are recognised.
     ///
-    /// Van Rossem adds 14 new Plutus VM builtins (CIP-0109/0132/0133/0138/0153).
-    /// This crate phase-2 *evaluates* scripts, so every such builtin must be
-    /// supported by the `uplc` VM (the only Aiken crate we use — `aiken-lang`,
-    /// the compiler, is not on the evaluation path) before a transaction using
-    /// it can be evaluated.
-    ///
-    /// We probe support empirically by asking the real uplc parser whether it
-    /// recognises each builtin name: a name only parses if this uplc version
-    /// knows the builtin. As of uplc 1.1.22 NONE are recognised (even
-    /// `expModInteger`'s FromStr/Display are commented out upstream, and the
-    /// other 13 have no enum variant), so we assert zero support.
-    ///
-    /// WHEN THIS TEST FAILS: uplc has gained Van Rossem builtins. That is the
-    /// trigger to (1) bump uplc, and (2) replace this probe with real phase-2
-    /// evaluation tests that execute each new builtin and assert the result.
-    /// (Builtin names below are the CIP/spec names and may need tweaking to the
-    /// exact textual names upstream settles on.)
+    /// When this test fails, uplc has gained Van Rossem builtins: bump uplc and
+    /// replace this probe with real phase-2 evaluation tests for each builtin.
+    /// (Names below are the CIP names and may differ from uplc's final spelling.)
     #[test]
     fn van_rossem_builtins_not_yet_supported_by_uplc() {
         use std::str::FromStr;
         use uplc::builtins::DefaultFunction;
 
-        // DefaultFunction::from_str is uplc's authoritative name->builtin lookup
-        // (the UPLC parser itself uses it). It returns Err for any builtin this
-        // uplc version doesn't know — no panic, unlike calling the parser.
+        // uplc's authoritative name->builtin lookup; Err for unknown builtins.
         let recognises = |builtin: &str| DefaultFunction::from_str(builtin).is_ok();
 
         // Sanity: an existing builtin must resolve, proving the probe itself works.

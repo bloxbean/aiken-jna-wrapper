@@ -10,14 +10,8 @@ authors = ["satran004", "matiwinnetou"]
 crate-type = ["cdylib"]
 
 [dependencies]
-# Pinned to an exact version and kept in lockstep with the pallas line it
-# requires: uplc 1.1.22 depends on pallas ^0.35, so the pallas pins below must
-# stay on 0.35.x. Mixing lines makes `uplc::tx::eval_phase_two` fail to compile
-# with mismatched pallas types.
-#
-# Only uplc is needed: this crate phase-2 *evaluates* scripts via the uplc VM.
-# aiken-lang (the Aiken language compiler) was an unused dependency and is not
-# on the evaluation path, so it has been removed.
+# uplc requires pallas ^0.35, so the pallas crates below are pinned to 0.35.x to
+# match; mixing pallas lines breaks eval_phase_two compilation.
 uplc = "=1.1.22"
 
 pallas-addresses = "0.35.1"
@@ -28,9 +22,7 @@ pallas-traverse = "0.35.1"
 
 hex = "0.4.3"
 
-# Kept on the 0.25 line: pallas-codec pins minicbor ^0.25, and transaction.rs
-# encodes pallas types whose Encode impls come from that same minicbor. A 2.x
-# bump would mismatch those trait impls and break redeemer CBOR encoding.
+# Pinned to 0.25 to match pallas-codec's minicbor ^0.25 (shared Encode impls).
 minicbor = "0.25.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150" }

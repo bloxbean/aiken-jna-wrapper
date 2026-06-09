@@ -1,39 +1,11 @@
 name: Memory Checks
 
-# =============================================================================
-# Memory-safety checks for the unsafe FFI boundary (to_ptr / dropCharPointer /
-# to_string in src/lib.rs). These catch leaks, use-after-free and double-free.
-#
-# WHY TWO SEPARATE JOBS?
-# They look similar but check DIFFERENT things, and neither alone is enough:
-#
-#   1. `miri`  — Miri *interprets* the Rust code instead of running a real
-#                binary. It is the best at finding Rust-level undefined
-#                behaviour (bad pointer aliasing, leaks, invalid frees) and
-#                explains problems in Rust terms. BUT it cannot execute the C
-#                dependencies (blst, secp256k1) or simulate a real foreign
-#                (Java/JNA) caller — it never crosses the FFI boundary.
-#
-#   2. `asan`  — AddressSanitizer + LeakSanitizer run the REAL compiled binary
-#                with checks baked in by the compiler. Because it is the actual
-#                machine code, it DOES see the full native path, including the C
-#                deps. It is the end-to-end check Miri can't do, but it reasons
-#                at the machine level, not in Rust terms.
-#
-# In short: Miri proves the Rust ownership logic is sound; ASan/LSan prove the
-# real binary doesn't leak when it actually runs. Each is blind to what the
-# other covers, so we run both. (A third option, Valgrind, also runs the real
-# binary but is Linux-only and noisy with blst's hand-written assembly, so we
-# use ASan instead.)
-#
-# WHY WEEKLY + ON-DEMAND, NOT ON EVERY PUSH?
-# Both tools are slow, need the nightly toolchain, and only cover the small,
-# rarely-changed unsafe surface. Keeping them off push/pull_request avoids
-# taxing unrelated commits and avoids coupling merge velocity to nightly's
-# day-to-day health. The weekly run catches "drift" (e.g. a dependency bump
-# changing allocation behaviour); the manual "Run workflow" button covers
-# on-demand checks.
-# =============================================================================
+# Memory-safety checks for the unsafe FFI boundary in src/lib.rs. Two jobs that
+# cover different things: Miri finds Rust-level UB but can't run the C deps
+# (blst/secp256k1) or cross the FFI boundary; ASan/LSan run the real binary end
+# to end (C deps included) but reason at the machine level. Run weekly + on
+# demand (not per-push) because both are slow, need nightly, and the unsafe
+# surface rarely changes.
 on:
   schedule:
     # Mondays at 06:00 UTC
@@ -48,7 +20,6 @@ defaults:
     shell: bash
 
 jobs:
-  # FOCUS: Rust-level correctness of the unsafe code (does NOT run C deps).
   miri:
     name: Miri (FFI memory safety)
     runs-on: ubuntu-latest
@@ -63,21 +34,18 @@ jobs:
             ~/.cargo/registry
             ./target
           key: miri-cargo-${{ hashFiles('Cargo.toml') }}
-      # Only the memory-management tests are run under Miri. Tests that exercise
-      # the C deps (blst/secp256k1) via eval_phase_two cannot run under Miri, so
-      # the `char_pointer` filter selects exactly the unsafe-boundary round-trip
-      # and null-guard tests. Miri reports any leaked allocation as an error.
+      # The `char_pointer` filter selects only the FFI-boundary tests; tests
+      # that hit the C deps via eval_phase_two can't run under Miri.
       - name: Run Miri on FFI memory tests
         run: cargo +nightly miri test char_pointer
 
-  # FOCUS: real compiled binary end to end, including the C deps (what Miri can't).
   asan:
     name: ASan/LSan (FFI memory safety)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # rust-src is needed for -Zbuild-std, which rebuilds std with the
-      # sanitizer so leak detection covers allocations made in std (CString).
+      # rust-src is needed for -Zbuild-std so the sanitizer also covers std
+      # allocations (e.g. CString).
       - name: Install nightly toolchain with rust-src
         run: rustup toolchain install nightly --component rust-src
       - name: Cargo cache
@@ -87,11 +55,7 @@ jobs:
             ~/.cargo/registry
             ./target
           key: asan-cargo-${{ hashFiles('Cargo.toml') }}
-      # Complements the Miri job: ASan/LSan run the real compiled binary (which
-      # Miri cannot), so they validate the native path end to end. Scoped to the
-      # char_pointer tests for a focused, reliable leak signal — LeakSanitizer is
-      # fully supported on Linux. RUSTFLAGS applies the sanitizer; ASAN_OPTIONS
-      # turns on leak detection at exit.
+      # RUSTFLAGS applies the sanitizer; ASAN_OPTIONS enables leak detection.
       - name: Run ASan/LSan on FFI memory tests
         env:
           RUSTFLAGS: "-Zsanitizer=address"

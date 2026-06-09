@@ -11,9 +11,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::panic;
 
-// #[repr(C)] gives this a stable C memory layout so JNA can pass it by
-// value/reference into the native call. (No #[no_mangle]: it is meaningless
-// on a struct and is becoming a hard error.)
+// #[repr(C)] for a stable C layout so JNA can pass it across the FFI boundary.
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -23,7 +21,6 @@ pub struct SlotConfig {
     pub zero_time: u64,
 }
 
-// See SlotConfig above: #[repr(C)] for a stable C layout across the FFI boundary.
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -52,8 +49,9 @@ pub struct ApplyParamResponse {
     compiled_code: Option<String>,
 }
 
-// `extern "C"` exports this with the C calling convention (not Rust's
-// unstable one) so JNA can call it; #[no_mangle] keeps the symbol name as-is.
+// extern "C" + #[no_mangle] export this with a stable C ABI and symbol name so
+// JNA can call it. Returns *const c_char (c_char is i8 or u8 depending on the
+// platform), an owned string the caller must free via dropCharPointer.
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn eval_phase_two(
@@ -64,8 +62,6 @@ pub extern "C" fn eval_phase_two(
     initial_budget: InitialBudget,
     slot_config: SlotConfig,
 ) -> *const c_char {
-    // Use *const c_char (not *const i8) to match the return type on every
-    // platform: c_char is i8 on x86_64/Apple but u8 on aarch64-linux.
     let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return eval_phase_two_inner(
             to_string(tx_hex),
@@ -121,11 +117,10 @@ fn eval_phase_two_inner(
     }
 }
 
-// `extern "C"` for the C calling convention so JNA can call it (see eval_phase_two).
+// Exported for JNA like eval_phase_two above.
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
-    // *const c_char (not *const i8) to match the return type on all platforms; see eval_phase_two.
     let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return apply_params_to_plutus_script_inner(
             to_string(params),
@@ -165,44 +160,28 @@ fn to_string(pointer: *const c_char) -> String {
     c_str.to_str().unwrap().to_string()
 }
 
-/// Convert a Rust string to a native string, transferring ownership to the caller.
-///
-/// `CString::into_raw` leaks the string's heap allocation on purpose so the
-/// pointer stays valid after this function returns and Rust no longer manages
-/// it. The buffer is NOT freed here — ownership now belongs to the caller
-/// (the JVM, via JNA), which MUST hand the pointer back to `dropCharPointer`
-/// once it has copied the bytes out, or the allocation leaks. `into_raw`/
-/// `from_raw` are the matched pair that make this round-trip sound.
+/// Convert a Rust string to a native string, transferring ownership to the
+/// caller. `into_raw` intentionally leaks the allocation so the pointer stays
+/// valid after return; the caller (JVM via JNA) must free it via
+/// `dropCharPointer`, or it leaks.
 // TODO consider returning anyhow::Result<String>
 fn to_ptr(string: String) -> *const c_char {
     let cs = CString::new(string.as_bytes()).unwrap();
     cs.into_raw()
 }
 
-/// Free a string previously produced by `to_ptr` (and returned to the JVM as
-/// the result of `eval_phase_two` / `apply_params_to_plutus_script`).
+/// Free a string previously produced by `to_ptr`; `from_raw` reclaims the
+/// allocation `to_ptr` leaked so dropping it frees the buffer.
 ///
-/// This reclaims the allocation that `to_ptr` deliberately leaked: `from_raw`
-/// reconstructs the owning `CString` from the raw pointer so that dropping it
-/// frees the heap buffer. The Java side calls this after reading the string
-/// out of the returned pointer.
-///
-/// # Safety / contract
-/// `pointer` must be a pointer returned by `to_ptr` and must be passed here at
-/// most once (calling twice would be a double free). A null pointer is ignored.
-/// Note the previous implementation called `mem::drop` on the `*const c_char`
-/// itself, which is a no-op for a `Copy` raw pointer and therefore leaked the
-/// string on every call.
-///
-/// `extern "C"` so JNA can hand the pointer back across the C ABI.
+/// # Safety
+/// `pointer` must come from `to_ptr` and be passed here at most once (a second
+/// call is a double free). A null pointer is ignored.
 #[no_mangle]
 #[allow(non_snake_case)]
 extern "C" fn dropCharPointer(pointer: *const c_char) {
     if pointer.is_null() {
         return;
     }
-    // Safety: `pointer` originated from `CString::into_raw` in `to_ptr`, so it
-    // is valid to reconstitute the `CString` and drop it to free the buffer.
     unsafe {
         let _ = CString::from_raw(pointer as *mut c_char);
     }
@@ -273,16 +252,12 @@ mod lib {
     };
     use std::ffi::{CStr, CString};
 
-    /// to_ptr hands out an owned C string; dropCharPointer must reclaim it.
-    /// This exercises the full leak-fix round-trip: allocate, read back, free.
-    /// (A leak isn't directly observable in a unit test, but this guards
-    /// against regressions that would crash, e.g. dropping a non-from_raw ptr.)
+    /// Round-trips the to_ptr -> read -> dropCharPointer ownership handoff.
     #[test]
     pub fn to_ptr_then_drop_char_pointer_roundtrips() {
         let ptr = to_ptr("hello aiken".to_string());
         let read_back = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
         assert_eq!(read_back, "hello aiken");
-        // Frees the allocation that to_ptr leaked. Must not crash or double-free.
         dropCharPointer(ptr);
     }
 
@@ -292,12 +267,8 @@ mod lib {
         dropCharPointer(std::ptr::null());
     }
 
-    /// End-to-end test of the real exported `extern "C"` function — the surface
-    /// JNA actually calls. Unlike the other tests (which call the inner Rust
-    /// fn), this drives the full FFI boundary: *const c_char marshalling
-    /// (to_string), the panic::catch_unwind guard, JSON serialisation, the
-    /// to_ptr -> dropCharPointer ownership round-trip. Invalid hex is used so no
-    /// large fixture is needed; the happy-path inner logic is covered elsewhere.
+    /// Drives the real exported extern "C" fn (the surface JNA calls): pointer
+    /// marshalling, catch_unwind, JSON, and the to_ptr/dropCharPointer round-trip.
     #[test]
     pub fn eval_phase_two_ffi_boundary_returns_error_json_on_bad_input() {
         let bad = CString::new("zz").unwrap(); // not valid hex
@@ -326,7 +297,7 @@ mod lib {
         assert_eq!(response.status, Status::ERROR);
         assert!(response.error.is_some());
 
-        // Free the string the FFI call handed back (see leak-fix tests above).
+        // Free the string the FFI call handed back.
         dropCharPointer(ptr);
     }
 
