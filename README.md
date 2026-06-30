@@ -29,7 +29,7 @@ via `dropCharPointer`.
 ## Supported operating systems / architectures
 
 - Apple macOS (Intel `x86_64` and Apple Silicon `aarch64`)
-- Linux (`x86_64` and `aarch64`) — built on Ubuntu 24.04, compatible with other
+- Linux (`x86_64` and `aarch64`) — built on Ubuntu 22.04, compatible with other
   reasonably recent distributions
 - Windows (`x86_64` and `aarch64`)
 
