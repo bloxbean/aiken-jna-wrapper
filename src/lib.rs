@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::{mem, panic};
+use std::panic;
 
-#[no_mangle]
+// #[repr(C)] for a stable C layout so JNA can pass it across the FFI boundary.
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -21,7 +21,6 @@ pub struct SlotConfig {
     pub zero_time: u64,
 }
 
-#[no_mangle]
 #[repr(C)]
 #[allow(missing_copy_implementations)]
 #[derive(Clone)]
@@ -50,9 +49,12 @@ pub struct ApplyParamResponse {
     compiled_code: Option<String>,
 }
 
+// extern "C" + #[no_mangle] export this with a stable C ABI and symbol name so
+// JNA can call it. Returns *const c_char (c_char is i8 or u8 depending on the
+// platform), an owned string the caller must free via dropCharPointer.
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn eval_phase_two(
+pub extern "C" fn eval_phase_two(
     tx_hex: *const c_char,
     inputs: *const c_char,
     outputs: *const c_char,
@@ -60,7 +62,7 @@ pub fn eval_phase_two(
     initial_budget: InitialBudget,
     slot_config: SlotConfig,
 ) -> *const c_char {
-    let result: Result<*const i8, Box<dyn Any + Send>> = panic::catch_unwind(|| {
+    let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return eval_phase_two_inner(
             to_string(tx_hex),
             to_string(inputs),
@@ -115,10 +117,11 @@ fn eval_phase_two_inner(
     }
 }
 
+// Exported for JNA like eval_phase_two above.
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
-    let result: Result<*const i8, Box<dyn Any + Send>> = panic::catch_unwind(|| {
+pub extern "C" fn apply_params_to_plutus_script(params: *const c_char, plutus_script: *const c_char) -> *const c_char {
+    let result: Result<*const c_char, Box<dyn Any + Send>> = panic::catch_unwind(|| {
         return apply_params_to_plutus_script_inner(
             to_string(params),
             to_string(plutus_script)
@@ -157,21 +160,31 @@ fn to_string(pointer: *const c_char) -> String {
     c_str.to_str().unwrap().to_string()
 }
 
-/// Convert a Rust string to a native string
+/// Convert a Rust string to a native string, transferring ownership to the
+/// caller. `into_raw` intentionally leaks the allocation so the pointer stays
+/// valid after return; the caller (JVM via JNA) must free it via
+/// `dropCharPointer`, or it leaks.
 // TODO consider returning anyhow::Result<String>
 fn to_ptr(string: String) -> *const c_char {
     let cs = CString::new(string.as_bytes()).unwrap();
-    let ptr = cs.as_ptr();
-    // Tell Rust not to clean up the string while we still have a pointer to it.
-    // Otherwise, we'll get a segfault.
-    mem::forget(cs);
-    ptr
+    cs.into_raw()
 }
 
+/// Free a string previously produced by `to_ptr`; `from_raw` reclaims the
+/// allocation `to_ptr` leaked so dropping it frees the buffer.
+///
+/// # Safety
+/// `pointer` must come from `to_ptr` and be passed here at most once (a second
+/// call is a double free). A null pointer is ignored.
 #[no_mangle]
 #[allow(non_snake_case)]
-fn dropCharPointer(pointer: *const c_char) {
-    mem::drop(pointer);
+extern "C" fn dropCharPointer(pointer: *const c_char) {
+    if pointer.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = CString::from_raw(pointer as *mut c_char);
+    }
 }
 
 fn json_fallback() -> String {
@@ -234,8 +247,59 @@ fn error_apply_params_json(error: Error) -> String {
 #[cfg(test)]
 mod lib {
     use crate::{
-        eval_phase_two_inner, ExUnitsEvaluationResponse, InitialBudget, SlotConfig, Status,
+        dropCharPointer, eval_phase_two, eval_phase_two_inner, to_ptr, ExUnitsEvaluationResponse,
+        InitialBudget, SlotConfig, Status,
     };
+    use std::ffi::{CStr, CString};
+
+    /// Round-trips the to_ptr -> read -> dropCharPointer ownership handoff.
+    #[test]
+    pub fn to_ptr_then_drop_char_pointer_roundtrips() {
+        let ptr = to_ptr("hello aiken".to_string());
+        let read_back = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
+        assert_eq!(read_back, "hello aiken");
+        dropCharPointer(ptr);
+    }
+
+    /// dropCharPointer must treat a null pointer as a no-op, not crash.
+    #[test]
+    pub fn drop_char_pointer_ignores_null() {
+        dropCharPointer(std::ptr::null());
+    }
+
+    /// Drives the real exported extern "C" fn (the surface JNA calls): pointer
+    /// marshalling, catch_unwind, JSON, and the to_ptr/dropCharPointer round-trip.
+    #[test]
+    pub fn eval_phase_two_ffi_boundary_returns_error_json_on_bad_input() {
+        let bad = CString::new("zz").unwrap(); // not valid hex
+        let budget = InitialBudget {
+            mem: 16000000,
+            cpu: 10000000000,
+        };
+        let slot = SlotConfig {
+            zero_time: 1596059091000,
+            zero_slot: 0,
+            slot_length: 1000,
+        };
+
+        let ptr = eval_phase_two(
+            bad.as_ptr(),
+            bad.as_ptr(),
+            bad.as_ptr(),
+            bad.as_ptr(),
+            budget,
+            slot,
+        );
+        assert!(!ptr.is_null());
+
+        let json = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
+        let response: ExUnitsEvaluationResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(response.status, Status::ERROR);
+        assert!(response.error.is_some());
+
+        // Free the string the FFI call handed back.
+        dropCharPointer(ptr);
+    }
 
     #[test]
     pub fn eval_phase_test_success() {

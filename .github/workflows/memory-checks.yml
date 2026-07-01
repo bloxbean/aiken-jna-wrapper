@@ -1,0 +1,63 @@
+name: Memory Checks
+
+# Memory-safety checks for the unsafe FFI boundary in src/lib.rs. Two jobs that
+# cover different things: Miri finds Rust-level UB but can't run the C deps
+# (blst/secp256k1) or cross the FFI boundary; ASan/LSan run the real binary end
+# to end (C deps included) but reason at the machine level. Run weekly + on
+# demand (not per-push) because both are slow, need nightly, and the unsafe
+# surface rarely changes.
+on:
+  schedule:
+    # Mondays at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  miri:
+    name: Miri (FFI memory safety)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly toolchain with Miri
+        run: rustup toolchain install nightly --component miri
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          key: miri-cargo-${{ hashFiles('Cargo.toml') }}
+      # The `char_pointer` filter selects only the FFI-boundary tests; tests
+      # that hit the C deps via eval_phase_two can't run under Miri.
+      - name: Run Miri on FFI memory tests
+        run: cargo +nightly miri test char_pointer
+
+  asan:
+    name: ASan/LSan (FFI memory safety)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rust-src is needed for -Zbuild-std so the sanitizer also covers std
+      # allocations (e.g. CString).
+      - name: Install nightly toolchain with rust-src
+        run: rustup toolchain install nightly --component rust-src
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          key: asan-cargo-${{ hashFiles('Cargo.toml') }}
+      # RUSTFLAGS applies the sanitizer; ASAN_OPTIONS enables leak detection.
+      - name: Run ASan/LSan on FFI memory tests
+        env:
+          RUSTFLAGS: "-Zsanitizer=address"
+          ASAN_OPTIONS: "detect_leaks=1"
+        run: cargo +nightly test -Zbuild-std --target x86_64-unknown-linux-gnu char_pointer

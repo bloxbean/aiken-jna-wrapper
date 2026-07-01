@@ -1,6 +1,6 @@
 [package]
 name = "aiken-jna-wrapper"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["satran004", "matiwinnetou"]
 
@@ -10,20 +10,20 @@ authors = ["satran004", "matiwinnetou"]
 crate-type = ["cdylib"]
 
 [dependencies]
-uplc = "1.1.13"
-aiken-lang = "1.1.13"
+# uplc requires pallas ^0.35, so the pallas crates below are pinned to 0.35.x to
+# match; mixing pallas lines breaks eval_phase_two compilation.
+uplc = "=1.1.22"
 
-pallas-addresses = "0.32.0"
-pallas-codec = { version = "0.32.0", features = ["num-bigint"] }
-pallas-crypto = "0.32.0"
-pallas-primitives = "0.32.0"
-pallas-traverse = "0.32.0"
+pallas-addresses = "0.35.1"
+pallas-codec = { version = "0.35.1", features = ["num-bigint"] }
+pallas-crypto = "0.35.1"
+pallas-primitives = "0.35.1"
+pallas-traverse = "0.35.1"
 
-ffi-support = "0.4.4"
-jni = "0.21.1"
 hex = "0.4.3"
 
+# Pinned to 0.25 to match pallas-codec's minicbor ^0.25 (shared Encode impls).
 minicbor = "0.25.1"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = { version = "1.0.128" }
-anyhow = "1.0.89"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.150" }
+anyhow = "1.0.102"
